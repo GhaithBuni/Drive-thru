@@ -3,8 +3,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 // Drive‑Thru Fönsterkiosk — SVENSKA
-// Nu med val: En person (en roll) eller Två personer (två roller)
-// När man klickar på en person i listan markeras den för att visa att den är vald.
+// Val: En person (en roll) eller Två personer (två roller)
+// Markerar vald person i listan
+// + Visar en "Klagomål under period"‑bild på tips‑skärmen med enkel redigeringspanel
 
 const STAFF = [
   { id: "1001", name: "Alex Kim" },
@@ -148,7 +149,7 @@ export default function KioskWindow() {
 
       <footer className="p-6 border-t border-white/10 bg-neutral-900 text-center text-white/60">
         Genom att använda den här kiosken samtycker du till tidsloggning enligt
-        restaurangens policy.
+        butikens policy.
       </footer>
     </div>
   );
@@ -319,6 +320,38 @@ function TipsScreen({
   const [tipIndex, setTipIndex] = useState(0);
   const [now, setNow] = useState(new Date());
 
+  // ------- Klagomål (bild + period) -------
+  const [complaintsUrl, setComplaintsUrl] = useState<string>("");
+  const [periodFrom, setPeriodFrom] = useState<string>("");
+  const [periodTo, setPeriodTo] = useState<string>("");
+  const [editOpen, setEditOpen] = useState(false);
+
+  // Ladda ev. sparad konfiguration från localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kiosk_complaints_cfg");
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        if (cfg?.url) setComplaintsUrl(cfg.url);
+        if (cfg?.from) setPeriodFrom(cfg.from);
+        if (cfg?.to) setPeriodTo(cfg.to);
+      } else {
+        // Standard: en enkel placeholder‑bild
+        setComplaintsUrl(
+          "https://dummyimage.com/800x400/111827/ffffff&text=Klagom%C3%A5l+per+period"
+        );
+      }
+    } catch {}
+  }, []);
+
+  const saveCfg = () => {
+    const cfg = { url: complaintsUrl, from: periodFrom, to: periodTo };
+    try {
+      localStorage.setItem("kiosk_complaints_cfg", JSON.stringify(cfg));
+    } catch {}
+    setEditOpen(false);
+  };
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     const rot = setInterval(
@@ -342,6 +375,11 @@ function TipsScreen({
     .toString()
     .padStart(2, "0");
 
+  const periodLabel =
+    periodFrom || periodTo
+      ? `${periodFrom || "?"} – ${periodTo || "?"}`
+      : "Välj period";
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -363,6 +401,7 @@ function TipsScreen({
         </div>
       </div>
 
+      {/* Tips‑kort */}
       <div className="rounded-2xl border border-white/10 bg-neutral-800/50 p-5">
         <div className="text-sm text-white/50 mb-2">Tips för drive‑thru</div>
         <div className="text-xl">{TIPS[tipIndex]}</div>
@@ -376,6 +415,98 @@ function TipsScreen({
             />
           ))}
         </div>
+      </div>
+
+      {/* Klagomål‑kort */}
+      <div className="rounded-2xl border border-white/10 bg-neutral-800/50 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm text-white/50">Klagomål under period</div>
+            <div className="text-lg font-medium">{periodLabel}</div>
+          </div>
+          <button
+            onClick={() => setEditOpen((v) => !v)}
+            className="h-10 px-4 rounded-xl border border-white/10 bg-neutral-800 hover:bg-neutral-700 text-sm"
+          >
+            {editOpen ? "Stäng" : "Redigera"}
+          </button>
+        </div>
+
+        {editOpen && (
+          <div className="grid md:grid-cols-3 gap-3 mb-4">
+            <div>
+              <label className="text-xs text-white/60">Från</label>
+              <input
+                type="date"
+                value={periodFrom}
+                onChange={(e) => setPeriodFrom(e.target.value)}
+                className="mt-1 w-full h-10 rounded-lg bg-neutral-900 border border-white/10 px-3 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/60">Till</label>
+              <input
+                type="date"
+                value={periodTo}
+                onChange={(e) => setPeriodTo(e.target.value)}
+                className="mt-1 w-full h-10 rounded-lg bg-neutral-900 border border-white/10 px-3 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/60">Bild‑URL</label>
+              <input
+                type="url"
+                value={complaintsUrl}
+                onChange={(e) => setComplaintsUrl(e.target.value)}
+                placeholder="https://…"
+                className="mt-1 w-full h-10 rounded-lg bg-neutral-900 border border-white/10 px-3 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+            </div>
+            <div className="md:col-span-3 flex gap-3">
+              <button
+                onClick={saveCfg}
+                className="h-10 px-4 rounded-xl bg-white text-black font-semibold"
+              >
+                Spara
+              </button>
+              <button
+                onClick={() => {
+                  setPeriodFrom("");
+                  setPeriodTo("");
+                  setComplaintsUrl("");
+                  localStorage.removeItem("kiosk_complaints_cfg");
+                }}
+                className="h-10 px-4 rounded-xl border border-white/10 bg-neutral-800 hover:bg-neutral-700"
+              >
+                Rensa
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-[16/9] flex items-center justify-center">
+          {complaintsUrl ? (
+            <img
+              src={complaintsUrl}
+              alt="Klagomål per period"
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <div className="text-white/50">Ingen bild vald</div>
+          )}
+        </div>
+        {complaintsUrl && (
+          <div className="mt-2 text-right text-xs text-white/60">
+            <a
+              href={complaintsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline"
+            >
+              Öppna bild i ny flik
+            </a>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -395,3 +526,30 @@ function TipsScreen({
     </div>
   );
 }
+
+/* -----------------------------------------------------------
+   FÖRESLAGNA TESTER (lägg i __tests__/kiosk.test.tsx)
+--------------------------------------------------------------
+import { render, screen, fireEvent } from "@testing-library/react";
+import KioskWindow from "../app/kiosk/page";
+
+beforeEach(() => { localStorage.clear(); });
+
+test("kan spara klagomåls‑konfiguration i localStorage", () => {
+  render(<KioskWindow />);
+  // välj En person
+  fireEvent.click(screen.getByText(/En person/i));
+  // välj första personen
+  fireEvent.change(screen.getByPlaceholderText(/Ange namn/i), { target: { value: "Alex" } });
+  fireEvent.click(screen.getByText(/Alex Kim/i));
+
+  // öppna Redigera
+  fireEvent.click(screen.getByText(/Redigera/i));
+  const url = screen.getByPlaceholderText(/https:\/\//i);
+  fireEvent.change(url, { target: { value: "https://example.com/bild.png" } });
+  fireEvent.click(screen.getByText(/Spara/i));
+
+  const saved = JSON.parse(localStorage.getItem("kiosk_complaints_cfg") || "{}");
+  expect(saved.url).toBe("https://example.com/bild.png");
+});
+*/
